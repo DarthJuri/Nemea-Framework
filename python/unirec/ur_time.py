@@ -29,7 +29,7 @@ class Timestamp(long):
         if isinstance(sec, float):
             return cls.fromSecMsec(int(sec), int((sec-int(sec))*1000))
         else:
-            return long.__new__(cls, sec << 32)
+            return cls(sec << 32)
 
     @classmethod
     def fromSecMsec(cls, sec, msec):
@@ -37,12 +37,12 @@ class Timestamp(long):
         Create instance of Timestamp from a number of seconds and miliseconds since the epoch.
         Both sec and msec should be integers.
         """
-        return long.__new__(cls, (sec << 32) | ((msec * MSEC_TO_FRAC) >> 32))
+        return cls((sec << 32) | ((msec * MSEC_TO_FRAC) >> 32))
 
     @classmethod
     def fromUniRec(cls, bytes):
         "Create instance of Timestamp from a time in UniRec format (64bit integer as string of bytes)."
-        return long.__new__(cls, struct.unpack("=Q", bytes)[0])
+        return cls(bytes)
 
     @classmethod
     def fromString(cls, string):
@@ -66,7 +66,7 @@ class Timestamp(long):
         if match.group(7) is not None:
             msec = long(float(match.group(7)) * 1000)
         val = (long(sec) << 32) | ((long(msec) * MSEC_TO_FRAC) >> 32)
-        return long.__new__(cls, val)
+        return cls(val)
 
     @classmethod
     def now(cls):

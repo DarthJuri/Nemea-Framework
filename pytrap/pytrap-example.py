@@ -24,12 +24,11 @@ def mainLoop():
         if i == 0:
             UR_Flow = unirec.CreateTemplate("UR_Flow", ctx.getDataFmt(0)[1])
         rec = UR_Flow(a)
+        rec.serialize()
 
 
-#import cProfile
-#cProfile.run('mainLoop()')
-mainLoop()
+import cProfile
+cProfile.run('mainLoop()')
+#mainLoop()
 
 ctx.finalize()
-
-

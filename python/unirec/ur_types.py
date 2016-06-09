@@ -6,7 +6,7 @@ from collections import namedtuple
 from unirec.ur_ipaddr import *
 from unirec.ur_time import Timestamp
 
-FieldSpec = namedtuple("FieldSpec", "size python_type struct_type")
+FieldSpec = namedtuple("FieldSpec", "size python_type struct_type struct_len")
 
 size_table = {
     b"char": 1,
@@ -27,21 +27,21 @@ size_table = {
 }
 
 python_types = {
-    b"char": (str, "c"),
-    b"uint8": (int, "B"),
-    b"int8": (int, "b"),
-    b"uint16": (int, "H"),
-    b"int16": (int, "h"),
-    b"uint32": (int, "i"),
-    b"int32": (int, "I"),
-    b"uint64": (int, "q"),
-    b"int64": (int, "Q"),
-    b"float": (float, "f"),
-    b"double": (float, "d"),
-    b"ipaddr": (IPAddr, "16s"),
-    b"time": (Timestamp, "8s"),
-    b"string": (str, "s"),
-    b"bytes": (str, "s"),
+    b"char": (str, "c", 1),
+    b"uint8": (int, "B", 1),
+    b"int8": (int, "b", 1),
+    b"uint16": (int, "H", 1),
+    b"int16": (int, "h", 1),
+    b"uint32": (int, "i", 1),
+    b"int32": (int, "I", 1),
+    b"uint64": (int, "q", 1),
+    b"int64": (int, "Q", 1),
+    b"float": (float, "f", 1),
+    b"double": (float, "d", 1),
+    b"ipaddr": (IPAddr, "16s", 1),
+    b"time": (Timestamp, "Q", 1),
+    b"string": (str, "s", 1),
+    b"bytes": (str, "s", 1),
 }
 
 type_table = {

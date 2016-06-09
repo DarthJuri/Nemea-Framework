@@ -30,16 +30,6 @@ class IPAddr(long):
     """
     __slots__ = ()
 
-    def __new__(cls, val=None):
-        if val is None:
-            return IP4Addr()
-        elif isinstance(val, str):
-            return cls.fromString(val)
-        elif isinstance(val, long) or isinstance(val, int):
-            raise TypeError("Use IP4Addr or IP6Addr to convert from a number.")
-        else:
-            raise TypeError("Can't convert object of type " + str(type(val)) + " to IP4Addr or IP6Addr.")
-
     @classmethod
     def fromBytes(cls, val):
         if len(val) == 4:
@@ -52,14 +42,11 @@ class IPAddr(long):
     @classmethod
     def fromUniRec(cls, val):
         "Convert IP address in UniRec format to IP4Addr or IP6Addr"
-        if len(val) != 16:
-            raise ValueError("IPAddr.fromUniRec takes only a 16-byte string.")
+        x = struct.unpack(">IIII", val)
+        if x[0] == 0 and x[1] == 0 and x[3] == 0xffffffff:
+            return IP4Addr(x[2])
         else:
-            x = struct.unpack(">IIII", val)
-            if x[0] == 0 and x[1] == 0 and x[3] == 0xffffffff:
-                return IP4Addr.fromLong(x[2])
-            else:
-                return IP6Addr.fromBytes(val)
+            return IP6Addr(x[0] << 96 | x[1] << 64 | x[2] << 32 | x[3])
 
     @classmethod
     def fromString(cls, val):
@@ -81,36 +68,21 @@ class IP4Addr(IPAddr):
     """
     __slots__ = ()
 
-    def __new__(cls, val=long(0)):
-        if isinstance(val, IP4Addr):
-            return val
-        elif isinstance(val, long) or isinstance(val, int):
-            return cls.fromLong(val)
-        elif isinstance(val, str):
-            if len(val) == 4:
-                return cls.fromBytes(val)
-            return cls.fromString(val)
-        else:
-            raise TypeError("Can't convert object of type " + str(type(val)) + " to IP4Addr. Only str and int/long are valid.")
-
     @classmethod
     def fromLong(cls, val):
-        if 0 <= val < 2**32:
-            return long.__new__(cls, val)
-        else:
-            raise ValueError("IPv4 address must be between 0 and 2^32-1")
+        return cls(val)
 
     @classmethod
     def fromBytes(cls, val):
         x = struct.unpack("BBBB", val)
-        return long.__new__(cls, x[0] << 24 | x[1] << 16 | x[2] << 8 | x[3])
+        return cls(x[0] << 24 | x[1] << 16 | x[2] << 8 | x[3])
 
     @classmethod
     def fromString(cls, val):
         x = map(long, val.split('.'))
         if not (len(x) == 4 and all(map(lambda a: 0 <= a < 256, x))):
             raise ValueError('String "' + val + '" is not a valid IPv4 address.')
-        return long.__new__(cls, x[0] << 24 | x[1] << 16 | x[2] << 8 | x[3])
+        return cls(x[0] << 24 | x[1] << 16 | x[2] << 8 | x[3])
 
     def toBytes(self):
         return struct.pack(">I", long(self))
@@ -158,30 +130,17 @@ class IP6Addr(IPAddr):
     """
     __slots__ = ()
 
-    def __new__(cls, val=long(0)):
-        if isinstance(val, IP6Addr):
-            return val
-        elif isinstance(val, long) or isinstance(val, int):
-            return cls.fromLong(val)
-        elif isinstance(val, str):
-            # You must call fromBytes explicitly, 16 bytes can also be a human-readable string
-            # if len(val) == 16:
-            #    return fromBytes(val)
-            return cls.fromString(val)
-        else:
-            raise TypeError("Can't convert object of type " + str(type(val)) + " to IP6Addr. Only str and int/long are valid.")
-
     @classmethod
     def fromLong(cls, val):
         if 0 <= val < 2**128:
-            return long.__new__(cls, val)
+            return cls(val)
         else:
             raise ValueError("IPv6 address must be between 0 and 2^128-1")
 
     @classmethod
     def fromBytes(cls, val):
         x = struct.unpack(">IIII", val)
-        return long.__new__(cls, x[0] << 96 | x[1] << 64 | x[2] << 32 | x[3])
+        return cls(x[0] << 96 | x[1] << 64 | x[2] << 32 | x[3])
 
     @classmethod
     def fromString(cls, val):
@@ -202,7 +161,7 @@ class IP6Addr(IPAddr):
 
             # join it into string and convert it to long
             x = ''.join(x)
-            return long.__new__(cls, x, 16)
+            return cls(x, 16)
 
         elif len(x) == 2:
             x1 = x[0].split(":")
@@ -228,7 +187,7 @@ class IP6Addr(IPAddr):
 
             # join it into string and convert it to long
             x = ''.join(x1) + "0000"*missing + ''.join(x2)
-            return long.__new__(cls, x, 16)
+            return cls(x, 16)
         else:
             raise err
 
@@ -376,6 +335,8 @@ class IP6Range(IPRange):
             return self.start <= addr <= self.end
 
 # If module is ran as a standalone script, run tests
+# This tests cannot be used for the version that is optimized for unirec
+# performance
 # TODO tests for IPRange
 if __name__ == '__main__':
     import unittest

@@ -14,7 +14,7 @@ if sys.version_info > (3,):
     unicode = str
     bytes = bytes
     basestring = (str, bytes)
-    import functools  # because of backward compatibility with python 2.6 (cmp_to_key is available since Python 2.7)
+    import functools  # cmp_to_key is available since Python 2.7
     newsorted = sorted
 
     def sorted(to_sort, cmp):
@@ -33,7 +33,7 @@ FIELD_GROUPS = {
 
 def getFieldSpec(field_type):
     pt = python_types[field_type]
-    return FieldSpec(size_table[field_type], pt[0], pt[1])
+    return FieldSpec(size_table[field_type], pt[0], pt[1], pt[2])
 
 
 def genFieldsFromNegotiation(fmtspec):
@@ -64,16 +64,17 @@ def cmpFields(f1, f2):
 
 
 def CreateTemplate(template_name, field_names, verbose=False):
-    '''Returns a new UniRec class.'''
+    """Returns a new UniRec class.
+    """
     global FIELDS
     # Validate template name
     if not min(c.isalnum() or c == '_' for c in template_name):
-        raise ValueError('Template name can only contain alphanumeric characters'
-                         ' and underscores: %r' % template_name)
+        raise ValueError('Template name can only contain alphanumeric'
+                         'characters and underscores: %r' % template_name)
     if iskeyword(template_name):
-        raise ValueError('Template name cannot be a keyword: %r' % template_name)
+        raise ValueError("Template name can't be a keyword: %r" % template_name)
     if template_name[0].isdigit():
-        raise ValueError('Template name cannot start with a number: %r' %
+        raise ValueError("Template name can't start with a number: %r" %
                          template_name)
 
     # Parse string with field names
@@ -119,11 +120,16 @@ def CreateTemplate(template_name, field_names, verbose=False):
     staticpart = []
     for key in (x for x in _slots if FIELDS[x].size != -1):
         curr_type = _field_types[key]
-        if hasattr(curr_type,  'fromUniRec'):
-            staticpart.append("self." + key + " = " + curr_type.__name__ + ".fromUniRec(t[" + str(index) + "])")
+        curr_len = FIELDS[key].struct_len
+        if curr_len > 1:
+            ending = ":" + str(index + curr_len)
         else:
-            staticpart.append("self." + key + " = t[" + str(index) + "]")
-        index += 1
+            ending = ""
+        if hasattr(curr_type,  'fromUniRec'):
+            staticpart.append("self." + key + " = " + curr_type.__name__ + ".fromUniRec(t[" + str(index) + ending + "])")
+        else:
+            staticpart.append("self." + key + " = t[" + str(index) + ending + "]")
+        index += curr_len
 
     offset = staticsize
     dynamicpart = []
@@ -135,12 +141,11 @@ def CreateTemplate(template_name, field_names, verbose=False):
     strinit = """def init(self, data=None):
     if data is None:
         """ + "\n        ".join(nonepart) + """ 
-    elif isinstance(data, str) or isinstance(data, bytes):
-        t = struct.unpack_from('""" + _staticfmt + """', data, 0)
+    else:
+        #isinstance(data, str) or isinstance(data, bytes):
+        t = struct.unpack('""" + _staticfmt + """', data)
         """ + "\n        ".join(staticpart) + """
         """ + "\n        ".join(dynamicpart) + """
-    else:
-        raise TypeError("%s() argument must be a string or None, not '%s'" % (__name__, type(data).__name__))
     """
 
     exec_scope = globals()
@@ -148,21 +153,51 @@ def CreateTemplate(template_name, field_names, verbose=False):
 
     classdict['__init__'] = exec_scope['init']
 
-    def length(self):
-        return len(_slots)
+    statics = []
+    dynamics = []
+    dyn_spec = []
+    for k in _slots:
+        if FIELDS[k].size != -1:
+            if (FIELDS[k].struct_type[-1] == "s" and FIELDS[k].python_type != str):
+                statics.append("self." + k + ".toUniRec()")
+            else:
+                statics.append("self." + k)
+        else:
+            dyn_spec.append("length = len(self." + key +")")
+            dyn_spec.append("s += struct.pack('=HH', offset, length)")
+            dyn_spec.append("offset += length")
+            dynamics.append("s += self." + key)
 
-    classdict['__len__'] = length
+    strserialize = """def serialize(self):
+        s = struct.pack('""" + _staticfmt + "'," + ", ".join(statics) + """)
+        offset = 0
+        """ + "\n        ".join(dyn_spec) + """
+        """ + "\n        ".join(dynamics) + """
+        return s"""
+
+    exec(strserialize, exec_scope)
+
+    classdict['serialize'] = exec_scope['serialize']
+
+    strlen = """def length(self):
+        return """ + str(len(_slots))
+
+    exec(strlen, exec_scope)
+    classdict['__len__'] = exec_scope['length']
 
     @staticmethod
     def minsize():
-        """Return minimal size of a record with this template, i.e. size of the static part, in bytes."""
+        """Return minimal size of a record with this template,
+        i.e. size of the static part, in bytes.
+        """
         return minimalsize
 
     classdict['minsize'] = minsize
 
     @staticmethod
     def fields():
-        """Return list of names of all fields"""
+        """Return list of names of all fields
+        """
         return list(_slots)
 
     classdict['fields'] = fields
@@ -229,26 +264,10 @@ def CreateTemplate(template_name, field_names, verbose=False):
 
         self.__dict__[attr] = value
 
-    classdict['__setattr__'] = setattr
-
-    def serialize(self):
-        staticvals = tuple(self.__dict__[key].toUniRec() if (FIELDS[key].struct_type[-1] == "s" and FIELDS[key].python_type != str) else self.__dict__[key] for key in _slots if FIELDS[key].size != -1) 
-        s = struct.pack(_staticfmt, *staticvals)
-        offset = 0
-        for key in (x for x in _slots if FIELDS[x].size == -1):
-            length = len(self.__dict__[key])
-            s += struct.pack("=HH", offset, length)
-            offset += length
-        for key in (x for x in _slots if FIELDS[x].size == -1):
-            s += self.__dict__[key]
-        return s
-
-    classdict['serialize'] = serialize
-
     cls = type(template_name, (), classdict)
-    # For pickling to work, the __module__ variable needs to be set to the frame
-    # where the named tuple is created.  Bypass this step in enviroments where
-    # sys._getframe is not defined (Jython for example).
+    # For pickling to work, the __module__ variable needs to be set to the
+    # frame where the named tuple is created. Bypass this step in enviroments
+    # where sys._getframe is not defined (Jython for example).
     if hasattr(sys, '_getframe') and sys.platform != 'cli':
         cls.__module__ = sys._getframe(1).f_globals['__name__']
     return cls
