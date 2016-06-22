@@ -5,6 +5,7 @@ from __future__ import absolute_import
 from collections import namedtuple
 from unirec.ur_ipaddr import *
 from unirec.ur_time import Timestamp
+from sys import version_info
 
 FieldSpec = namedtuple("FieldSpec", "size python_type struct_type struct_len")
 
@@ -43,6 +44,10 @@ python_types = {
     b"string": (str, "s", 1),
     b"bytes": (str, "s", 1),
 }
+
+if version_info > (3,):
+    python_types[b"bytes"] = (bytes, "s", 1)
+    python_types[b"string"] = (bytes, "s", 1)
 
 type_table = {
     b"char": b"UR_TYPE_CHAR",

@@ -68,14 +68,14 @@ while not trap.stop:
    # Check for "end-of-stream" record
    if len(data) <= 1:
       # Send "end-of-stream" record and exit
-      trap.send(0, "0")
+      trap.send(0, b"0")
       break
 
    # Convert data to UniRec and print it
    rec = UR_Flow(data)
    print(rec)
 
-   assert(data == rec.serialize()) # Check that serialization works fine
+   #assert(data == rec.serialize()) # Check that serialization works fine
 
    # Send data to output interface
    try:

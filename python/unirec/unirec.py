@@ -142,7 +142,7 @@ def CreateTemplate(template_name, field_names, verbose=False):
     if data is None:
         """ + "\n        ".join(nonepart) + """ 
     else:
-        t = struct.unpack('""" + _staticfmt + """', data)
+        t = struct.unpack_from('""" + _staticfmt + """', data, 0)
         """ + "\n        ".join(staticpart) + """
         """ + "\n        ".join(dynamicpart) + """
     """
