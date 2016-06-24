@@ -184,7 +184,11 @@ def CreateTemplate(template_name, field_names, verbose=False):
     classdict['__repr__'] = repr
 
     def tostring(self):
-        return ", ".join([key+"="+str(self.__dict__[key]) for key in _slots])
+        try:
+            return ", ".join([key+"="+str(self.__dict__[key]) for key in _slots])
+        except UnicodeDecodeError as e:
+            print(self.__dict__)
+            raise e
 
     classdict['__str__'] = tostring
 
