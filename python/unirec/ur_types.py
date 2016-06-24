@@ -45,7 +45,7 @@ python_types = {
     b"bytes": (str, "s"),
 }
 
-if version_info > (3, 0):
+if version_info > (3,):
     python_types[b"string"] = (bytes, "s")
     python_types[b"bytes"] = (bytes, "s")
 
